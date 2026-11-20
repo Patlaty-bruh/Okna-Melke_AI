@@ -61,12 +61,37 @@ function showScreen(screen) {
 function addMessage(text, kind) {
     const message = document.createElement("div");
     message.className = `message message--${kind}`;
-    const paragraph = document.createElement("p");
-    paragraph.textContent = text;
-    message.append(paragraph);
+    // Сообщения пользователя и служебные — простой текст; ответ модели — Markdown.
+    if (kind === "agent") {
+        message.innerHTML = renderMarkdown(text);
+    } else {
+        message.textContent = text;
+    }
     messages.append(message);
     messages.scrollTop = messages.scrollHeight;
     return message;
+}
+
+// Модель отвечает в Markdown. HTML из ответа экранируется: текст модели
+// не должен вставлять на страницу свою разметку.
+marked.use({
+    gfm: true,
+    breaks: true,
+    renderer: {
+        link(token) {
+            const text = this.parser.parseInline(token.tokens);
+            const title = token.title ? ` title="${token.title}"` : "";
+            return `<a href="${token.href}" target="_blank" rel="noopener"${title}>${text}</a>`;
+        },
+    },
+});
+
+function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderMarkdown(text) {
+    return marked.parse(escapeHtml(text));
 }
 
 function showTyping() {
@@ -79,7 +104,7 @@ function showTyping() {
 }
 
 function setMessageText(message, text) {
-    message.querySelector("p").textContent = text;
+    message.innerHTML = renderMarkdown(text);
     messages.scrollTop = messages.scrollHeight;
 }
 
@@ -185,13 +210,15 @@ async function sendMessage(text) {
     sendButton.disabled = true;
 
     let bubble = null;
+    let streamed = "";
     try {
         const data = await streamAnswer(text, (delta) => {
             if (!bubble) {
                 typing.remove();
                 bubble = addMessage("", "agent");
             }
-            setMessageText(bubble, bubble.querySelector("p").textContent + delta);
+            streamed += delta;
+            setMessageText(bubble, streamed);
         });
         typing.remove();
         const answer = typeof data.message === "string" ? data.message.trim() : "";
