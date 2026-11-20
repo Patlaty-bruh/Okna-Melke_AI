@@ -11,6 +11,38 @@ const messages = document.getElementById("chat-messages");
 const form = document.getElementById("chat-form");
 const input = document.getElementById("chat-input");
 const sendButton = form.querySelector(".chat__send");
+const themeToggle = document.getElementById("theme-toggle");
+
+// ---------- Тема чата ----------
+
+const THEME_KEY = "melke-theme";
+
+function applyTheme(theme) {
+    const isDark = theme === "dark";
+    document.documentElement.dataset.theme = isDark ? "dark" : "light";
+    themeToggle.setAttribute("aria-pressed", String(isDark));
+    themeToggle.setAttribute("aria-label", isDark ? "Включить светлую тему" : "Включить тёмную тему");
+    try {
+        localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+    } catch (error) {
+        // В приватном режиме браузер может запретить localStorage: тема останется до перезагрузки.
+        console.warn("Не удалось сохранить тему", error);
+    }
+}
+
+function storedTheme() {
+    try {
+        return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+    } catch (error) {
+        return "light";
+    }
+}
+
+applyTheme(storedTheme());
+
+themeToggle.addEventListener("click", () => {
+    applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+});
 
 function showScreen(screen) {
     const active = screen === "chat" ? chatScreen : welcomeScreen;
