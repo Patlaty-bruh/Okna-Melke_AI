@@ -51,8 +51,10 @@ class ApiSettings(BaseSettings):
 
     # Список адресов frontend через запятую
     cors_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
-    # Предельное время обработки одного сообщения агентом, секунды
-    agent_turn_timeout: float = 120.0
+    # Предельное время обработки одного сообщения агентом, секунды.
+    # Запас нужен на первый запрос: модель эмбеддингов RAG (~1.2 ГБ) загружается
+    # внутри хода агента и на холодном кэше занимает ~5 минут.
+    agent_turn_timeout: float = 600.0
 
     @property
     def cors_origin_list(self) -> list[str]:

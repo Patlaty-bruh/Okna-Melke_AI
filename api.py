@@ -3,6 +3,8 @@
 import asyncio
 import json
 import logging
+import os
+import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -20,6 +22,15 @@ from models import AgentResponse
 from sessions import SessionNotFound, SessionStore
 
 logger = logging.getLogger(__name__)
+
+# В контейнере своего logging-конфига нет: включаем логи приложения с уровнем из LOG_LEVEL.
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(levelname)s %(name)s: %(message)s",
+)
+# Библиотеки шумят каждым HTTP-запросом к DeepSeek и HuggingFace.
+for noisy in ("httpx", "httpx2", "httpcore", "httpcore2"):
+    logging.getLogger(noisy).setLevel(logging.WARNING)
 
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 
@@ -193,9 +204,10 @@ def _session_agent(session_id: str) -> Agent:
 
 async def _ask(agent: Agent, message: str) -> AgentResponse:
     timeout = get_api_settings().agent_turn_timeout
+    started = time.perf_counter()
     try:
         async with asyncio.timeout(timeout):
-            return await agent.ask(message)
+            response = await agent.ask(message)
     except TimeoutError:
         logger.warning("Превышено время ожидания ответа агента: %.0f c", timeout)
         raise _error(status.HTTP_504_GATEWAY_TIMEOUT) from None
@@ -204,6 +216,8 @@ async def _ask(agent: Agent, message: str) -> AgentResponse:
     except Exception:
         logger.exception("Ошибка выполнения агента")
         raise _error(status.HTTP_502_BAD_GATEWAY) from None
+    logger.info("Ответ агента получен за %.1f c", time.perf_counter() - started)
+    return response
 
 
 def _validated(response: AgentResponse) -> AgentResponse:
@@ -217,6 +231,7 @@ def _validated(response: AgentResponse) -> AgentResponse:
 
 async def _stream(agent: Agent, session_id: str, message: str) -> AsyncIterator[str]:
     timeout = get_api_settings().agent_turn_timeout
+    started = time.perf_counter()
     try:
         async with store.lock(session_id), asyncio.timeout(timeout):
             async for item in agent.ask_stream(message):
@@ -230,6 +245,8 @@ async def _stream(agent: Agent, session_id: str, message: str) -> AsyncIterator[
     except Exception:
         logger.exception("Ошибка стриминга ответа агента")
         yield _sse("error", {"message": MESSAGES["agent_error"]})
+    else:
+        logger.info("Поток ответа агента завершён за %.1f c", time.perf_counter() - started)
 
 
 # ---------- Обработка ошибок ----------
