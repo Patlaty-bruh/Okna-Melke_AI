@@ -646,6 +646,45 @@ RAG предназначен для хранения и поиска нестр�
 
 Конкретный выбор embedding-модели, векторного хранилища, размера чанков и алгоритма гибридного поиска фиксируется отдельно при реализации RAG.
 
+### 9.1. Реализованная часть RAG: гибридный поиск
+
+Реализован гибридный поиск: Dense + Sparse (BM25) + RRF. Reranker и пользовательский интерфейс поиска не реализованы.
+
+Технологии:
+
+- chunking — `RecursiveCharacterTextSplitter` (`langchain-text-splitters`), `chunk_size` 2000, `chunk_overlap` 300;
+- embeddings — `Qwen3-Embedding-0.6B` (`sentence-transformers`), размерность 1024, нормализованные векторы, косинусная метрика; query instruction применяется только к поисковым запросам (на английском — так рекомендует карточка модели);
+- Dense — PostgreSQL + `pgvector`, HNSW-индекс (`vector_cosine_ops`);
+- Sparse — BM25 (k1 = 1.2, b = 0.75) по обратному индексу лексем; лексика нормализуется словарём PostgreSQL `russian`;
+- объединение — Reciprocal Rank Fusion (`k` = 60);
+- в модель передаётся 5–7 наиболее релевантных чанков (по умолчанию 6), у каждого есть текст, файл, раздел и URL источника.
+
+Таблицы RAG:
+
+`knowledge_documents` — реестр проиндексированных документов.
+
+- `source_file` (PK) — имя файла в `knowledge_base/`;
+- `content_hash` — SHA-256 содержимого на момент индексации;
+- `chunk_count`;
+- `indexed_at`.
+
+`knowledge_chunks` — чанки и их векторы.
+
+- `id` (PK);
+- `source_file` (FK на `knowledge_documents`, `ON DELETE CASCADE`);
+- `chunk_index`, `text`, `embedding` (`vector(1024)`);
+- `source_url`, `category`, `product_name`, `section`, `page_number`;
+- `token_count` — длина чанка в лексемах (dl для BM25);
+- `metadata` (JSONB: `document_title`, `heading_path`, `source_urls`, `document_source_urls`);
+- `created_at`, `updated_at`;
+- уникальность `(source_file, chunk_index)`.
+
+`knowledge_chunk_terms` — обратный индекс лексем для BM25: `chunk_id` (FK, `ON DELETE CASCADE`), `lexeme`, `tf`; уникальность `(chunk_id, lexeme)`, индекс по `lexeme`. Пополняется при индексации документа и удаляется вместе с его чанками.
+
+Категории чанков соответствуют именам файлов базы знаний (`company`, `technology`, `products`, `installation`, `warranty`, `maintenance`, `ordering`, `delivery`, `faq`, `documents`) и используются как фильтр при поиске во всех каналах.
+
+Индексация идемпотентна: документ переиндексируется только при изменении его хеша, старые чанки и их лексемы заменяются в одной транзакции. Запуск: `python -m rag.cli index`. Проверка поиска: `python -m rag.cli search "запрос" [--mode hybrid|dense|sparse] [--category ...]`.
+
 RAG не должен использоваться вместо PostgreSQL для поиска точных структурированных характеристик каталога.
 
 ## 10. Формат ответа агента
