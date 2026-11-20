@@ -99,3 +99,5 @@ class State(TypedDict):
     candidate_products: list[ProductCandidate]
 
     manager_handoff: ManagerHandoff
+
+    calculator_url: str | None

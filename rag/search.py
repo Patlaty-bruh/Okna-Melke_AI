@@ -50,18 +50,18 @@ class HybridSearcher:
         self,
         query: str,
         limit: int | None = None,
-        category: str | None = None,
+        categories: list[str] | None = None,
     ) -> list[HybridHit]:
         limit = limit or self._settings.search_limit
         dense_hits = self._store.dense_search(
             self._embedder.embed_query(query),
             limit=self._settings.dense_candidates,
-            category=category,
+            categories=categories,
         )
         sparse_hits = self._store.sparse_search(
             query,
             limit=self._settings.sparse_candidates,
-            category=category,
+            categories=categories,
         )
 
         dense_ranks = {hit.id: rank for rank, hit in enumerate(dense_hits, start=1)}

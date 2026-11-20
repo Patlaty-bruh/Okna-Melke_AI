@@ -294,13 +294,13 @@ class VectorStore:
         self,
         embedding: list[float],
         limit: int = 5,
-        category: str | None = None,
+        categories: list[str] | None = None,
     ) -> list[SearchHit]:
         params: dict[str, Any] = {"vector": embedding, "limit": limit}
         where = ""
-        if category:
-            where = "WHERE category = %(category)s"
-            params["category"] = category
+        if categories:
+            where = "WHERE category = ANY(%(categories)s)"
+            params["categories"] = categories
 
         sql = f"""
             SELECT id, source_file, section, source_url, category, product_name,
@@ -329,11 +329,11 @@ class VectorStore:
         self,
         query: str,
         limit: int = 20,
-        category: str | None = None,
+        categories: list[str] | None = None,
     ) -> list[SearchHit]:
         """Лексический поиск BM25 по обратному индексу лексем."""
 
-        where = "WHERE c.category = %(category)s" if category else ""
+        where = "WHERE c.category = ANY(%(categories)s)" if categories else ""
         sql = f"""
             WITH query_terms AS (
                 SELECT array_agg(DISTINCT lexeme) AS lexemes
@@ -378,8 +378,8 @@ class VectorStore:
             "b": BM25_B,
             "limit": limit,
         }
-        if category:
-            params["category"] = category
+        if categories:
+            params["categories"] = categories
 
         rows = self._conn.execute(sql, params).fetchall()
         return [

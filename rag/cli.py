@@ -90,8 +90,9 @@ def search_knowledge_base(
     """Проверочный поиск: hybrid (RRF), dense или sparse."""
 
     if mode == "sparse":
+        categories = [category] if category else None
         with VectorStore(settings) as store:
-            hits = store.sparse_search(query, limit=limit, category=category)
+            hits = store.sparse_search(query, limit=limit, categories=categories)
         print(f"Запрос: {query} | режим: sparse (BM25)\n")
         for number, hit in enumerate(hits, start=1):
             _print_hit(number, hit.score, hit.source_file, hit.section, hit.source_url, hit.text)
@@ -100,10 +101,11 @@ def search_knowledge_base(
         return 0
 
     embedder = Embedder(settings)
+    categories = [category] if category else None
     with VectorStore(settings) as store:
         if mode == "dense":
             hits = store.dense_search(
-                embedder.embed_query(query), limit=limit, category=category
+                embedder.embed_query(query), limit=limit, categories=categories
             )
             print(f"Запрос: {query} | режим: dense (pgvector)\n")
             for number, hit in enumerate(hits, start=1):
@@ -113,7 +115,7 @@ def search_knowledge_base(
             return 0
 
         hybrid_hits = HybridSearcher(settings, embedder, store).search(
-            query, limit=limit, category=category
+            query, limit=limit, categories=categories
         )
 
     print(f"Запрос: {query} | режим: hybrid (dense + BM25 + RRF)\n")

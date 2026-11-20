@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     postgres_db: str = "melke"
     postgres_user: str = "melke"
     postgres_password: str = ""
+    # Чтобы недоступная БД не подвешивала инструменты на минуты.
+    postgres_connect_timeout: int = 5
 
     # Исходные документы
     knowledge_base_dir: Path = PROJECT_ROOT / "knowledge_base"
@@ -89,6 +91,7 @@ class Settings(BaseSettings):
             "dbname": self.postgres_db,
             "user": self.postgres_user,
             "password": self.postgres_password,
+            "connect_timeout": self.postgres_connect_timeout,
         }
 
     def category_for(self, source_file: str) -> str:
