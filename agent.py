@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 from langchain_core.messages import (
@@ -82,15 +83,47 @@ class Agent:
 
     async def ask(self, text: str) -> AgentResponse:
         """Обрабатывает сообщение клиента и возвращает структурированный ответ."""
+        input_state, turn_start = self._turn_input(text)
+        result = await self._graph.ainvoke(input_state)
+        return self._finish_turn(result, turn_start)
+
+    async def ask_stream(self, text: str) -> AsyncIterator[str | AgentResponse]:
+        """Обрабатывает сообщение клиента, отдавая текст ответа по частям.
+
+        Части ответа приходят по мере генерации, последним элементом возвращается
+        структурированный ответ — единственный источник истины для клиента.
+        """
+        input_state, turn_start = self._turn_input(text)
+        result: State | None = None
+
+        async for mode, payload in self._graph.astream(
+            input_state, stream_mode=["messages", "values"]
+        ):
+            if mode == "values":
+                result = payload
+                continue
+            chunk, metadata = payload
+            if metadata.get("langgraph_node") != "agent" or _is_tool_call(chunk):
+                continue
+            delta = _text(chunk.content)
+            if delta:
+                yield delta
+
+        if result is None:
+            raise RuntimeError("Граф агента не вернул состояние диалога")
+        yield self._finish_turn(result, turn_start)
+
+    def _turn_input(self, text: str) -> tuple[State, int]:
+        """Данные хода: история диалога, сообщение клиента и индекс его начала."""
         history = _trim(self._state["messages"], self._settings.history_messages_limit)
         input_state: State = {
             **self._state,
             "messages": [*history, HumanMessage(content=text)],
             "last_user_message": text,
         }
-        turn_start = len(input_state["messages"]) - 1
+        return input_state, len(input_state["messages"]) - 1
 
-        result = await self._graph.ainvoke(input_state)
+    def _finish_turn(self, result: State, turn_start: int) -> AgentResponse:
         response = _build_response(result, turn_start)
         self._state = {
             **result,
@@ -115,6 +148,11 @@ class Agent:
                 for message in self._state["messages"]
             ],
         }
+
+
+def _is_tool_call(chunk: Any) -> bool:
+    """Промежуточные сообщения с вызовами инструментов клиенту не транслируются."""
+    return bool(getattr(chunk, "tool_calls", None) or getattr(chunk, "tool_call_chunks", None))
 
 
 def _route(state: State) -> str:

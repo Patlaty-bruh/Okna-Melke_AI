@@ -2,6 +2,9 @@
 
 from functools import lru_cache
 
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from rag.config import PROJECT_ROOT
 from rag.config import Settings as RagSettings
 
 
@@ -31,3 +34,31 @@ def get_settings() -> Settings:
     if not settings.deepseek_api:
         raise RuntimeError("Не задан DEEPSEEK_API в .env")
     return settings
+
+
+class ApiSettings(BaseSettings):
+    """Настройки FastAPI-интерфейса.
+
+    Не требуют ключа DeepSeek: проверка доступности и создание сессии должны
+    работать независимо от внешних сервисов.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Список адресов frontend через запятую
+    cors_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
+    # Предельное время обработки одного сообщения агентом, секунды
+    agent_turn_timeout: float = 120.0
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+
+@lru_cache(maxsize=1)
+def get_api_settings() -> ApiSettings:
+    return ApiSettings()
