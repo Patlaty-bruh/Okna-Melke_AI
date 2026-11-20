@@ -1,0 +1,528 @@
+/* Оформление в стиле melke.ru: тёмный #00171F, бордо #87374C, зелёный #A7CC70, шрифт Clear Sans. */
+
+@font-face {
+    font-family: "Clear Sans";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("assets/fonts/clear-sans-regular.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Clear Sans";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("assets/fonts/clear-sans-medium.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Clear Sans";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("assets/fonts/clear-sans-bold.woff2") format("woff2");
+}
+
+:root {
+    --color-main: #00171f;
+    --color-primary: #87374c;
+    --color-primary-light: #9f3e58;
+    --color-green: #a7cc70;
+    --color-green-dark: #9abe64;
+    --color-white: #fff;
+    --color-light-body: #f5f5f5;
+    --color-lightgray: #e5e8f9;
+    --color-dark: #1c1c1c;
+    --color-gray: #5d5d5d;
+    --border-radius: 20px;
+    --border-radius-small: 10px;
+    --border-radius-button: 40px;
+    --transition-base: 0.5s ease-in-out;
+    --font-main: "Clear Sans", system-ui, Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-main);
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--color-main);
+    background: var(--color-main);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1,
+p {
+    margin: 0;
+}
+
+/* ---------- Экраны и появление ---------- */
+
+.screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(12px);
+    transition: opacity var(--transition-base), transform var(--transition-base), visibility var(--transition-base);
+}
+
+.screen.is-active {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+
+@keyframes fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* ---------- Экран приветствия ---------- */
+
+.screen--welcome {
+    overflow: hidden;
+    padding: 32px clamp(20px, 5vw, 72px) 28px;
+    color: var(--color-white);
+    background:
+        radial-gradient(120% 90% at 12% 100%, rgba(167, 204, 112, 0.28), transparent 60%),
+        radial-gradient(90% 80% at 92% 0%, rgba(135, 55, 76, 0.55), transparent 62%),
+        var(--color-main);
+}
+
+.welcome__glow {
+    position: absolute;
+    top: -20%;
+    right: -10%;
+    width: 46vw;
+    height: 46vw;
+    min-width: 320px;
+    min-height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(229, 232, 249, 0.16), transparent 68%);
+    filter: blur(6px);
+    pointer-events: none;
+}
+
+.welcome__header,
+.welcome__content,
+.welcome__footer {
+    position: relative;
+    z-index: 1;
+}
+
+.welcome__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.logo {
+    display: inline-flex;
+    align-items: center;
+}
+
+.logo__img {
+    display: block;
+    width: 118px;
+    height: auto;
+}
+
+.welcome__badge {
+    padding: 6px 16px;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: var(--border-radius-button);
+}
+
+.welcome__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    max-width: 720px;
+    padding: 40px 0;
+}
+
+.welcome__eyebrow {
+    margin-bottom: 18px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-green);
+}
+
+.welcome__title {
+    margin-bottom: 22px;
+    font-size: clamp(34px, 5.4vw, 64px);
+    font-weight: 500;
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+}
+
+.welcome__text {
+    max-width: 560px;
+    font-size: clamp(15px, 1.4vw, 18px);
+    color: rgba(255, 255, 255, 0.76);
+}
+
+.welcome__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 36px;
+}
+
+.welcome__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    justify-content: space-between;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.welcome__footer a {
+    color: var(--color-green);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.welcome__footer a:hover {
+    color: var(--color-white);
+}
+
+/* Появление элементов приветствия */
+
+.screen--welcome.is-active .welcome__header {
+    animation: fade-up 0.6s ease-out both;
+}
+
+.screen--welcome.is-active .welcome__eyebrow {
+    animation: fade-up 0.6s ease-out 0.08s both;
+}
+
+.screen--welcome.is-active .welcome__title {
+    animation: fade-up 0.6s ease-out 0.16s both;
+}
+
+.screen--welcome.is-active .welcome__text {
+    animation: fade-up 0.6s ease-out 0.26s both;
+}
+
+.screen--welcome.is-active .welcome__actions .button:nth-child(1) {
+    animation: fade-up 0.6s ease-out 0.36s both;
+}
+
+.screen--welcome.is-active .welcome__actions .button:nth-child(2) {
+    animation: fade-up 0.6s ease-out 0.46s both;
+}
+
+.screen--welcome.is-active .welcome__footer {
+    animation: fade-up 0.6s ease-out 0.56s both;
+}
+
+/* ---------- Кнопки ---------- */
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 56px;
+    padding: 0 32px;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-button);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+
+.button:active {
+    transform: translateY(1px);
+}
+
+.button__icon {
+    transition: transform 0.3s ease;
+}
+
+.button:hover .button__icon {
+    transform: translateX(3px);
+}
+
+.button--light {
+    color: var(--color-white);
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.button--light:hover {
+    color: var(--color-main);
+    background: var(--color-white);
+    border-color: var(--color-white);
+}
+
+.button--green {
+    color: var(--color-main);
+    background: var(--color-green);
+}
+
+.button--green:hover {
+    color: var(--color-white);
+    background: var(--color-green-dark);
+}
+
+/* ---------- Экран чата ---------- */
+
+.screen--chat {
+    background: var(--color-light-body);
+}
+
+.chat__header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px clamp(16px, 4vw, 40px);
+    background: var(--color-dark);
+    color: var(--color-white);
+}
+
+.screen--chat.is-active .chat__header {
+    animation: fade-up 0.5s ease-out both;
+}
+
+.chat__back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    color: var(--color-white);
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.chat__back:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.chat__identity {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.chat__identity .logo__img {
+    width: 92px;
+}
+
+.chat__status {
+    font-size: 12px;
+    color: var(--color-green);
+}
+
+.chat__messages {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: clamp(16px, 4vw, 32px) clamp(16px, 4vw, 40px);
+    overflow-y: auto;
+}
+
+.screen--chat.is-active .chat__messages {
+    animation: fade-up 0.5s ease-out 0.06s both;
+}
+
+.message {
+    max-width: min(640px, 82%);
+    padding: 14px 18px;
+    font-size: 15px;
+    border-radius: var(--border-radius);
+    animation: fade-up 0.45s ease-out both;
+}
+
+.message--agent {
+    align-self: flex-start;
+    background: var(--color-white);
+    border-bottom-left-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 23, 31, 0.06);
+}
+
+.message--user {
+    align-self: flex-end;
+    color: var(--color-white);
+    background: var(--color-main);
+    border-bottom-right-radius: 6px;
+}
+
+.message--error {
+    align-self: flex-start;
+    color: var(--color-primary);
+    background: rgba(135, 55, 76, 0.08);
+    border: 1px solid rgba(135, 55, 76, 0.2);
+    border-bottom-left-radius: 6px;
+}
+
+.message--typing {
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    align-self: flex-start;
+    padding: 18px;
+    background: var(--color-white);
+    border-radius: var(--border-radius);
+    border-bottom-left-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 23, 31, 0.06);
+}
+
+.message--typing span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    opacity: 0.4;
+    animation: blink 1.2s ease-in-out infinite;
+}
+
+.message--typing span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.message--typing span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes blink {
+    0%,
+    60%,
+    100% {
+        opacity: 0.25;
+        transform: translateY(0);
+    }
+    30% {
+        opacity: 1;
+        transform: translateY(-3px);
+    }
+}
+
+.chat__form {
+    display: flex;
+    gap: 10px;
+    padding: 14px clamp(16px, 4vw, 40px) clamp(16px, 4vw, 28px);
+    background: var(--color-white);
+    border-top: 1px solid var(--color-lightgray);
+}
+
+.screen--chat.is-active .chat__form {
+    animation: fade-up 0.5s ease-out 0.12s both;
+}
+
+.chat__input {
+    flex: 1;
+    min-height: 52px;
+    padding: 0 20px;
+    font-family: inherit;
+    font-size: 15px;
+    color: var(--color-main);
+    background: var(--color-light-body);
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-button);
+    outline: none;
+    transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.chat__input::placeholder {
+    color: var(--color-gray);
+}
+
+.chat__input:focus {
+    background: var(--color-white);
+    border-color: var(--color-green);
+}
+
+.chat__send {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    color: var(--color-main);
+    background: var(--color-green);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
+}
+
+.chat__send:hover {
+    color: var(--color-white);
+    background: var(--color-green-dark);
+}
+
+.chat__send:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* ---------- Мобильная версия ---------- */
+
+@media (max-width: 560px) {
+    .welcome__actions {
+        flex-direction: column;
+        align-self: stretch;
+    }
+
+    .button {
+        width: 100%;
+    }
+
+    .welcome__footer {
+        justify-content: flex-start;
+    }
+
+    .message {
+        max-width: 88%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001s !important;
+        animation-delay: 0s !important;
+        transition-duration: 0.001s !important;
+    }
+}

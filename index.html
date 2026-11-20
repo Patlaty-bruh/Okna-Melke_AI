@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Melke — AI-помощник</title>
+    <link rel="preload" href="assets/fonts/clear-sans-regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/clear-sans-medium.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <script>
+        // Адрес API агента. Меняется при развёртывании без пересборки образа.
+        window.MELKE_CONFIG = { chatApiUrl: "/api/chat" };
+    </script>
+
+    <!-- Экран приветствия -->
+    <section class="screen screen--welcome is-active" id="screen-welcome">
+        <div class="welcome__glow" aria-hidden="true"></div>
+
+        <header class="welcome__header">
+            <a class="logo" href="https://www.melke.ru" target="_blank" rel="noopener">
+                <img class="logo__img" src="assets/melke-logo-white.webp" alt="Melke" width="118" height="31">
+            </a>
+            <span class="welcome__badge">AI-консультант</span>
+        </header>
+
+        <div class="welcome__content">
+            <p class="welcome__eyebrow">Пластиковые окна Melke</p>
+            <h1 class="welcome__title">Здравствуйте!<br>Чем можем помочь?</h1>
+            <p class="welcome__text">
+                Подберу окна под ваш дом, рассчитаю конфигурацию и отвечу на вопросы
+                о профиле, стеклопакете и монтаже. А если хотите посмотреть каталог — переходите на сайт.
+            </p>
+
+            <div class="welcome__actions">
+                <a class="button button--light" href="https://www.melke.ru" target="_blank" rel="noopener">
+                    Перейти на сайт
+                    <svg class="button__icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M4 12L12 4M12 4H5.5M12 4V10.5" fill="none" stroke="currentColor" stroke-width="1.6"
+                              stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+                <button class="button button--green" type="button" id="open-chat">
+                    AI-помощник
+                    <svg class="button__icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M2 8h11M8.5 3.5L13 8l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6"
+                              stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <footer class="welcome__footer">
+            <span>Melke · окна ПВХ с установкой в Москве</span>
+            <a href="tel:74956619001">8 (495) 661 90 01</a>
+        </footer>
+    </section>
+
+    <!-- Экран чата -->
+    <section class="screen screen--chat" id="screen-chat" aria-hidden="true">
+        <header class="chat__header">
+            <button class="chat__back" type="button" id="close-chat" aria-label="Вернуться на главный экран">
+                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M12 4l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="chat__identity">
+                <img class="logo__img" src="assets/melke-logo-white.webp" alt="Melke" width="92" height="24">
+                <span class="chat__status">AI-помощник · на связи</span>
+            </div>
+        </header>
+
+        <div class="chat__messages" id="chat-messages" role="log" aria-live="polite">
+            <div class="message message--agent">
+                <p>Здравствуйте! Расскажите, какие окна нужны: дом или квартира, сколько проёмов, важен ли
+                    температурный режим. Подберу варианты и подскажу по монтажу.</p>
+            </div>
+        </div>
+
+        <form class="chat__form" id="chat-form">
+            <input class="chat__input" id="chat-input" type="text" autocomplete="off"
+                   placeholder="Напишите сообщение…" aria-label="Сообщение для AI-помощника">
+            <button class="chat__send" type="submit" aria-label="Отправить сообщение">
+                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M3 10h13M10.5 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </form>
+    </section>
+
+    <script src="app.js"></script>
+</body>
+</html>
