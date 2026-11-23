@@ -7,3 +7,5 @@ __pycache__
 .env
 .ruff_cache
 .pytest_cache
+start.cmd
+docker-compose.yml

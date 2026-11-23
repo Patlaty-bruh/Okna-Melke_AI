@@ -46,6 +46,10 @@ class HybridSearcher:
         self._embedder = embedder
         self._store = store
 
+    def close(self) -> None:
+        """Закрывает соединение с БД: нужно перед пересозданием поисковика."""
+        self._store.close()
+
     def search(
         self,
         query: str,

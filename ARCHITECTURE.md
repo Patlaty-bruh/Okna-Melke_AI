@@ -881,6 +881,7 @@ Backend будет обращаться к API или публичному ин�
 | `frontend/` | интерфейс чата (статика из ветки `frontend`), получает ответ потоком (§16) |
 | `Dockerfile`, `.dockerignore` | образ `app`: uvicorn (API + frontend) и агент в одном процессе |
 | `docker-compose.yml` | запуск MVP: `app` (API + frontend + агент) и `db` (PostgreSQL + pgvector) |
+| `start.cmd` | запуск стека двойным кликом на Windows (без терминала и без прав администратора) |
 
 Принятые решения MVP:
 
@@ -971,10 +972,35 @@ docker compose exec app python -c "from rag.config import Settings; from rag.emb
 Длительность каждого хода пишется в лог (`Ответ агента получен за N c`,
 `Поток ответа агента завершён за N c`) при `LOG_LEVEL=INFO`.
 
+### Перезапуск и подключение к БД
+
+Перезапуск стека — `docker compose up -d` (идемпотентно: compose сам пересоздаёт контейнер
+при расхождении конфигурации или состава сетей и переподключает его к сети проекта).
+
+Инструменты держат долгоживущие подключения к PostgreSQL (`Catalog`, `HybridSearcher`),
+поэтому в `tools.py` есть `_run_db_call`: при `psycopg.OperationalError`/`InterfaceError`
+кэш подключений сбрасывается (`_reset_db_caches`) и запрос повторяется один раз.
+Значит, `docker compose restart db` и пересоздание контейнера БД не требуют перезапуска
+приложения — в логе будет `WARNING tools: Соединение с PostgreSQL потеряно, пересоздаю подключение`.
+Модель эмбеддингов при этом не перезагружается: она кэшируется отдельно от подключения (`_embedder`).
+
+Симптом `failed to resolve host 'db'` в логе означает, что контейнер БД выпал из сети проекта
+(после ручных операций с сетями или очистки сетей); лечится тем же `docker compose up -d`.
+
 ### Запуск и развёртывание
 
 - основной способ — `docker compose`: `docker compose up -d --build` (сервисы `app` и `db`, §16).
   Интерфейс и API открываются на `http://localhost:8000/`, PostgreSQL — на `localhost:5433`;
+- на Windows без терминала: двойной клик по `start.cmd` в корне проекта — он делает
+  `docker compose up -d`, ждёт `/health` и открывает `http://localhost:8000/` в браузере;
+- в PowerShell / CMD (без прав администратора): `cd C:\путь\к\проекту` и `docker compose up -d`;
+- в WSL (Ubuntu) нужна включённая интеграция Docker Desktop:
+  Settings → Resources → WSL integration → включить дистрибутив. Без неё `docker` внутри WSL
+  отвечает `The command 'docker' could not be found in this WSL 2 distro`, а `sudo docker`
+  требует пароль и всё равно не работает: демон Docker Desktop живёт вне WSL;
+- в Docker Desktop → Containers кнопка Start у группы проекта запускает уже существующие
+  контейнеры (`compose start`) и не пересоздаёт выпавший из сети контейнер — для этого
+  нужен именно `docker compose up -d` (или `start.cmd`);
 - `app` — один процесс `uvicorn` (обязательно **один worker**: сессии в памяти), frontend
   раздаётся тем же приложением (`/`), поэтому CORS внутри compose не участвует;
   `CORS_ORIGINS` нужен только при выносе frontend на другой адрес;

@@ -4,9 +4,12 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Callable
+from contextlib import suppress
 from functools import lru_cache
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypeVar
 
+import psycopg
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import InjectedToolCallId, tool
 from langchain_openai import ChatOpenAI
@@ -47,10 +50,48 @@ def _criteria_model() -> ChatOpenAI:
 
 
 @lru_cache(maxsize=1)
+def _embedder() -> Embedder:
+    """Модель эмбеддингов создаётся один раз на процесс.
+
+    Кэшируется отдельно от поисковика: при потере соединения с БД модель перезагружать незачем.
+    """
+    return Embedder(get_settings())
+
+
+@lru_cache(maxsize=1)
 def _searcher() -> HybridSearcher:
-    """Гибридный поиск создаётся один раз: модель эмбеддингов (~2.4 ГБ) и подключение к БД."""
+    """Гибридный поиск создаётся один раз: модель эмбеддингов и подключение к БД."""
     settings = get_settings()
-    return HybridSearcher(settings, Embedder(settings), VectorStore(settings))
+    return HybridSearcher(settings, _embedder(), VectorStore(settings))
+
+
+_DbResult = TypeVar("_DbResult")
+
+
+def _reset_db_caches() -> None:
+    """Сбрасывает кэш подключений к PostgreSQL.
+
+    После перезапуска или пересоздания контейнера БД кэшированные Catalog и HybridSearcher
+    держат мёртвое соединение, и поиск перестаёт работать до перезапуска приложения.
+    """
+    if get_catalog.cache_info().currsize:
+        with suppress(Exception):
+            get_catalog().close()
+        get_catalog.cache_clear()
+    if _searcher.cache_info().currsize:
+        with suppress(Exception):
+            _searcher().close()
+        _searcher.cache_clear()
+
+
+def _run_db_call(call: Callable[[], _DbResult]) -> _DbResult:
+    """Выполняет обращение к БД, пересоздавая подключение при потере соединения."""
+    try:
+        return call()
+    except (psycopg.OperationalError, psycopg.InterfaceError):
+        logger.warning("Соединение с PostgreSQL потеряно, пересоздаю подключение")
+        _reset_db_caches()
+        return call()
 
 
 def _json(payload: dict[str, Any]) -> str:
@@ -130,7 +171,7 @@ async def search_products(query: str) -> str:
         )
 
     try:
-        hits = await asyncio.to_thread(get_catalog().search, criteria)
+        hits = await asyncio.to_thread(_run_db_call, lambda: get_catalog().search(criteria))
     except RuntimeError:
         logger.exception("Ошибка поиска по каталогу")
         return _json(
@@ -177,7 +218,9 @@ async def search_knowledge(
     chosen = _normalize_categories(categories)
 
     try:
-        hits = await asyncio.to_thread(_searcher().search, query, result_limit, chosen)
+        hits = await asyncio.to_thread(
+            _run_db_call, lambda: _searcher().search(query, result_limit, chosen)
+        )
     except Exception:
         logger.exception("Ошибка поиска по базе знаний")
         return _json(
