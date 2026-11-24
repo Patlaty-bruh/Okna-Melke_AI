@@ -3,10 +3,10 @@
 import argparse
 import sys
 
-from nlu.faq import load_faq
-from nlu.store import FaqQuestion, FaqStore
+from nlu.index import ensure_indexed, index_faq
+from nlu.store import FaqStore
 from rag.config import Settings
-from rag.embeddings import Embedder
+from rag.embeddings import get_embedder
 
 # Порог подобран прогоном по FAQ-датасету: при 0.93 заготовленный ответ не
 # подменяет ответ агента на реплики диалога, а промахи уходят агенту.
@@ -19,53 +19,19 @@ def _configure_stdout() -> None:
         sys.stdout.reconfigure(encoding="utf-8")
 
 
-def index_faq(settings: Settings) -> int:
-    """Считает векторы вопросов FAQ и записывает их в PostgreSQL.
+def run_index(settings: Settings, force: bool) -> int:
+    """Считает векторы FAQ и записывает их в PostgreSQL."""
 
-    Вопросы FAQ кодируются той же инструкцией, что и сообщения клиента:
-    сравниваются однородные тексты (вопрос с вопросом), поэтому косинусная
-    близость оказывается высокой и её легко пороговать.
-    """
-
-    categories = load_faq()
-    total_entries = sum(len(category.entries) for category in categories)
-    print(f"Категорий: {len(categories)}, вопросов: {total_entries}")
-
-    embedder = Embedder(settings)
-    if embedder.dimension != settings.embedding_dim:
-        raise RuntimeError(
-            f"Модель {embedder.model_name} отдаёт векторы размерности "
-            f"{embedder.dimension}, а в конфигурации указано {settings.embedding_dim}"
-        )
-
-    questions: list[FaqQuestion] = []
-    for category in categories:
-        texts: list[str] = []
-        owners = []
-        for entry in category.entries:
-            for text in entry.formulations:
-                texts.append(text)
-                owners.append(entry)
-        vectors = embedder.embed_queries(texts)
-        questions.extend(
-            FaqQuestion(
-                entry_id=entry.id,
-                category=category.category,
-                text=text,
-                question=entry.question,
-                answer=entry.answer,
-                source_url=entry.source_url,
-                embedding=vector,
-            )
-            for entry, text, vector in zip(owners, texts, vectors, strict=True)
-        )
-        print(f"[ok] {category.category}: вопросов {len(category.entries)}, формулировок {len(texts)}")
-
+    if force:
+        print(f"Проиндексировано формулировок: {index_faq(settings)}")
+    elif ensure_indexed(settings):
+        print("Индекс отсутствовал или устарел — пересчитан")
+    else:
+        print("Индекс актуален, пересчёт не требуется (--force — пересчитать)")
     with FaqStore(settings) as store:
-        store.ensure_schema()
-        written = store.replace_all(questions)
         print(
-            f"Записано формулировок: {written}, вопросов в БД: {store.entry_count()}"
+            f"В БД: формулировок {store.formulation_count()}, "
+            f"вопросов {store.entry_count()}"
         )
     return 0
 
@@ -73,7 +39,7 @@ def index_faq(settings: Settings) -> int:
 def search_faq(settings: Settings, query: str, threshold: float, limit: int) -> int:
     """Проверочное сопоставление сообщения с вопросами FAQ."""
 
-    embedder = Embedder(settings)
+    embedder = get_embedder(settings)
     with FaqStore(settings) as store:
         matches = store.search(embedder.embed_query(query), threshold, limit)
 
@@ -95,7 +61,12 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description="NLU-слой FAQ Melke")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("index", help="посчитать векторы FAQ и записать в PostgreSQL")
+    index_parser = subparsers.add_parser(
+        "index", help="посчитать векторы FAQ и записать в PostgreSQL"
+    )
+    index_parser.add_argument(
+        "--force", action="store_true", help="пересчитать, даже если датасет не менялся"
+    )
 
     search_parser = subparsers.add_parser("search", help="проверить сопоставление")
     search_parser.add_argument("query", help="сообщение клиента")
@@ -107,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "index":
-        return index_faq(settings)
+        return run_index(settings, args.force)
     return search_faq(settings, args.query, args.threshold, args.limit)
 
 

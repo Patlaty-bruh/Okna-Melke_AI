@@ -126,6 +126,10 @@ class NluLayer:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
 
+    @property
+    def settings(self) -> Settings:
+        return self._settings
+
     def reply(self, message: str) -> str | None:
         """Возвращает заготовленный ответ или None, если обрабатывать должен агент."""
 

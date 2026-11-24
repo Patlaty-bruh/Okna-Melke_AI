@@ -78,6 +78,16 @@ class FaqStore:
                 )
                 """
             )
+            # Одна строка: отпечаток датасета, который сейчас проиндексирован.
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS faq_index_meta (
+                    singleton    BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
+                    dataset_hash TEXT NOT NULL,
+                    indexed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
             version = self._conn.execute(
                 "SELECT extversion FROM pg_extension WHERE extname = 'vector'"
             ).fetchone()
@@ -110,9 +120,17 @@ class FaqStore:
             "SELECT count(DISTINCT entry_id) FROM faq_entries"
         ).fetchone()[0]
 
+    def dataset_hash(self) -> str | None:
+        """Отпечаток проиндексированного датасета (None — индекс не строился)."""
+
+        row = self._conn.execute(
+            "SELECT dataset_hash FROM faq_index_meta WHERE singleton"
+        ).fetchone()
+        return row[0] if row else None
+
     # ---------- запись ----------
 
-    def replace_all(self, questions: list[FaqQuestion]) -> int:
+    def replace_all(self, questions: list[FaqQuestion], dataset_hash: str) -> int:
         """Полностью заменяет содержимое таблицы (датасет небольшой)."""
 
         rows = [
@@ -138,6 +156,15 @@ class FaqStore:
                     """,
                     rows,
                 )
+            self._conn.execute(
+                """
+                INSERT INTO faq_index_meta (singleton, dataset_hash, indexed_at)
+                VALUES (TRUE, %s, now())
+                ON CONFLICT (singleton) DO UPDATE
+                SET dataset_hash = EXCLUDED.dataset_hash, indexed_at = now()
+                """,
+                (dataset_hash,),
+            )
         return len(rows)
 
     # ---------- поиск ----------

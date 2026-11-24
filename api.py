@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
@@ -19,6 +20,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from agent import Agent
 from config import get_api_settings
 from models import AgentResponse
+from nlu.index import ensure_indexed
 from nlu.layer import get_layer
 from sessions import SessionNotFound, SessionStore
 
@@ -99,7 +101,33 @@ class ErrorResponse(BaseModel):
 
 # ---------- Приложение ----------
 
-app = FastAPI(title="Melke Agent API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Восстанавливает индекс FAQ в фоне: после пересоздания БД ручных шагов не нужно.
+
+    Индексация не задерживает старт и `/health`: она идёт параллельно с запросами,
+    а до ее завершения NLU-слой просто передаёт сообщения агенту.
+    """
+    indexing = asyncio.create_task(_prepare_faq_index())
+    yield
+    indexing.cancel()
+    with suppress(asyncio.CancelledError):
+        await indexing
+
+
+async def _prepare_faq_index() -> None:
+    settings = get_layer().settings
+    if not settings.faq_enabled:
+        return
+    try:
+        indexed = await asyncio.to_thread(ensure_indexed, settings)
+        logger.info("Индекс FAQ готов (пересчитан: %s)", "да" if indexed else "нет")
+    except Exception:
+        logger.exception("Не удалось подготовить индекс FAQ: слой уйдёт в агент")
+
+
+app = FastAPI(title="Melke Agent API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_api_settings().cors_origin_list,

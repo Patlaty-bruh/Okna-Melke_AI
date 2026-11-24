@@ -1,5 +1,6 @@
 """FAQ-датасет: заготовленные вопросы и ответы из каталога faq/."""
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -49,3 +50,14 @@ def load_faq(directory: Path = FAQ_DIR) -> list[FaqCategory]:
     if not categories:
         raise ValueError(f"В каталоге {directory} нет файлов FAQ")
     return categories
+
+
+def dataset_hash(categories: list[FaqCategory]) -> str:
+    """Отпечаток датасета: по нему видно, нужно ли пересчитывать векторы."""
+
+    payload = json.dumps(
+        [category.model_dump(mode="json") for category in categories],
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
