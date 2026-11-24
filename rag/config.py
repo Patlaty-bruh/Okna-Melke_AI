@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     sparse_candidates: int = 20
     rrf_k: int = 60
 
+    # NLU-слой FAQ
+    faq_enabled: bool = True
+    # Порог подобран прогоном по FAQ-датасету: ниже него сообщение уходит агенту.
+    faq_match_threshold: float = 0.93
+
     @property
     def conninfo_kwargs(self) -> dict[str, object]:
         return {

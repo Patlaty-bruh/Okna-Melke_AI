@@ -58,12 +58,35 @@ class Embedder:
         )
         return [vector.tolist() for vector in vectors]
 
-    def embed_query(self, query: str) -> list[float]:
-        text = f"{self._settings.query_instruction}{query}"
-        vector = self._model.encode(
-            [text],
+    def embed_queries(self, texts: list[str]) -> list[list[float]]:
+        """Кодирует вопросы клиента (и любые тексты, с которыми они сравниваются)."""
+
+        if not texts:
+            return []
+        instructed = [f"{self._settings.query_instruction}{text}" for text in texts]
+        vectors = self._model.encode(
+            instructed,
+            batch_size=self._settings.embedding_batch_size,
             normalize_embeddings=True,
             convert_to_numpy=True,
             show_progress_bar=False,
         )
-        return vector[0].tolist()
+        return [vector.tolist() for vector in vectors]
+
+    def embed_query(self, query: str) -> list[float]:
+        return self.embed_queries([query])[0]
+
+
+_EMBEDDER: Embedder | None = None
+
+
+def get_embedder(settings: Settings) -> Embedder:
+    """Модель эмбеддингов одна на процесс: загрузка весов дорогая.
+
+    Используется и инструментами агента, и NLU-слоем FAQ.
+    """
+
+    global _EMBEDDER
+    if _EMBEDDER is None:
+        _EMBEDDER = Embedder(settings)
+    return _EMBEDDER

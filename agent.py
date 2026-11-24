@@ -132,6 +132,28 @@ class Agent:
         self.last_response = response
         return response
 
+    def record_ready_answer(self, text: str, message: str) -> AgentResponse:
+        """Записывает готовый ответ NLU-слоя в историю диалога.
+
+        Модель не вызывается, но ход попадает в messages, чтобы следующий ответ
+        учитывал вопрос клиента и то, что ему уже ответили.
+        """
+        self._state = {
+            **self._state,
+            "messages": _trim(
+                [
+                    *self._state["messages"],
+                    HumanMessage(content=text),
+                    AIMessage(content=message),
+                ],
+                self._settings.history_messages_limit,
+            ),
+            "last_user_message": text,
+        }
+        response = AgentResponse(message=message, handoff=self._state["manager_handoff"])
+        self.last_response = response
+        return response
+
     def state_dump(self) -> dict[str, Any]:
         """Состояние диалога для команды /state."""
         return {

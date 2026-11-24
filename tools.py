@@ -27,7 +27,7 @@ from models import (
     ToolStatus,
 )
 from prompts import PRODUCT_QUERY_INSTRUCTION
-from rag.embeddings import Embedder
+from rag.embeddings import Embedder, get_embedder
 from rag.search import HybridSearcher
 from rag.store import VectorStore
 from state import BudgetLevel, ManagerHandoffStatus, State
@@ -55,7 +55,7 @@ def _embedder() -> Embedder:
 
     Кэшируется отдельно от поисковика: при потере соединения с БД модель перезагружать незачем.
     """
-    return Embedder(get_settings())
+    return get_embedder(get_settings())
 
 
 @lru_cache(maxsize=1)

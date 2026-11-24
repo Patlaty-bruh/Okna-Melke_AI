@@ -19,6 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from agent import Agent
 from config import get_api_settings
 from models import AgentResponse
+from nlu.layer import get_layer
 from sessions import SessionNotFound, SessionStore
 
 logger = logging.getLogger(__name__)
@@ -207,7 +208,9 @@ async def _ask(agent: Agent, message: str) -> AgentResponse:
     started = time.perf_counter()
     try:
         async with asyncio.timeout(timeout):
-            response = await agent.ask(message)
+            response = await _prepared(agent, message)
+            if response is None:
+                response = await agent.ask(message)
     except TimeoutError:
         logger.warning("Превышено время ожидания ответа агента: %.0f c", timeout)
         raise _error(status.HTTP_504_GATEWAY_TIMEOUT) from None
@@ -216,8 +219,20 @@ async def _ask(agent: Agent, message: str) -> AgentResponse:
     except Exception:
         logger.exception("Ошибка выполнения агента")
         raise _error(status.HTTP_502_BAD_GATEWAY) from None
-    logger.info("Ответ агента получен за %.1f c", time.perf_counter() - started)
+    logger.info("Ответ получен за %.1f c", time.perf_counter() - started)
     return response
+
+
+async def _prepared(agent: Agent, message: str) -> AgentResponse | None:
+    """Заготовленный ответ NLU-слоя или None, если отвечать должен агент."""
+    try:
+        answer = await asyncio.to_thread(get_layer().reply, message)
+    except Exception:
+        logger.exception("NLU-слой недоступен, сообщение обрабатывает агент")
+        return None
+    if answer is None:
+        return None
+    return agent.record_ready_answer(message, answer)
 
 
 def _validated(response: AgentResponse) -> AgentResponse:
@@ -234,6 +249,11 @@ async def _stream(agent: Agent, session_id: str, message: str) -> AsyncIterator[
     started = time.perf_counter()
     try:
         async with store.lock(session_id), asyncio.timeout(timeout):
+            prepared = await _prepared(agent, message)
+            if prepared is not None:
+                yield _sse("delta", {"text": prepared.message})
+                yield _sse("done", _validated(prepared).model_dump(mode="json"))
+                return
             async for item in agent.ask_stream(message):
                 if isinstance(item, AgentResponse):
                     yield _sse("done", _validated(item).model_dump(mode="json"))
@@ -246,7 +266,7 @@ async def _stream(agent: Agent, session_id: str, message: str) -> AsyncIterator[
         logger.exception("Ошибка стриминга ответа агента")
         yield _sse("error", {"message": MESSAGES["agent_error"]})
     else:
-        logger.info("Поток ответа агента завершён за %.1f c", time.perf_counter() - started)
+        logger.info("Поток ответа завершён за %.1f c", time.perf_counter() - started)
 
 
 # ---------- Обработка ошибок ----------
