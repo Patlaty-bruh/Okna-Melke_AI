@@ -20,6 +20,14 @@ class Settings(RagSettings):
 
     calculator_url: str = "https://www.melke.ru/wincalc/"
 
+    # Opik: трейсинг ходов агента (LLM-вызовы, инструменты, токены)
+    opik_api_key: str = ""
+    opik_project_name: str = "melke-agent"
+
+    @property
+    def opik_enabled(self) -> bool:
+        return bool(self.opik_api_key)
+
     # Контекст диалога: последние 25 сообщений
     history_messages_limit: int = 25
     # Границы числа результатов поиска

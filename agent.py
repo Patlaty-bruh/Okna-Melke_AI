@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -30,6 +31,49 @@ FALLBACK_MESSAGE = (
     "Извините, не удалось сформировать ответ. Попробуйте переформулировать вопрос "
     "или я передам обращение менеджеру."
 )
+
+# Трейсер Opik создаётся один раз на процесс; None — трассировка выключена.
+_opik_tracer: Any | None = None
+_opik_ready = False
+
+
+def _tracer(settings: Settings) -> Any | None:
+    """LangChain-callback для Opik: одна трасса на ход со всеми LLM-вызовами и инструментами."""
+
+    global _opik_tracer, _opik_ready
+    if _opik_ready:
+        return _opik_tracer
+    _opik_ready = True
+    if not settings.opik_enabled:
+        return None
+    # Ключ и проект передаём через окружение: opik.configure() интерактивен
+    # (спрашивает workspace) и пишет файл конфигурации в домашний каталог,
+    # что не годится для контейнера.
+    os.environ.setdefault("OPIK_API_KEY", settings.opik_api_key)
+    os.environ.setdefault("OPIK_PROJECT_NAME", settings.opik_project_name)
+    try:
+        from opik.integrations.langchain import OpikTracer
+    except ImportError:
+        logger.warning("Библиотека opik не установлена: трассировка отключена")
+        return None
+    _opik_tracer = OpikTracer(project_name=settings.opik_project_name)
+    logger.info(
+        "Трассировка Opik включена, проект %s", settings.opik_project_name
+    )
+    return _opik_tracer
+
+
+def flush_tracing() -> None:
+    """Досылает накопленные трейсы: Opik отправляет их батчами в фоне."""
+
+    if _opik_tracer is None:
+        return
+    try:
+        import opik
+
+        opik.flush_tracker()
+    except Exception:
+        logger.warning("Не удалось дослать трейсы Opik", exc_info=True)
 
 
 def build_model(settings: Settings) -> Runnable:
@@ -84,7 +128,7 @@ class Agent:
     async def ask(self, text: str) -> AgentResponse:
         """Обрабатывает сообщение клиента и возвращает структурированный ответ."""
         input_state, turn_start = self._turn_input(text)
-        result = await self._graph.ainvoke(input_state)
+        result = await self._graph.ainvoke(input_state, config=_callbacks(self._settings))
         return self._finish_turn(result, turn_start)
 
     async def ask_stream(self, text: str) -> AsyncIterator[str | AgentResponse]:
@@ -97,7 +141,9 @@ class Agent:
         result: State | None = None
 
         async for mode, payload in self._graph.astream(
-            input_state, stream_mode=["messages", "values"]
+            input_state,
+            config=_callbacks(self._settings),
+            stream_mode=["messages", "values"],
         ):
             if mode == "values":
                 result = payload
@@ -170,6 +216,13 @@ class Agent:
                 for message in self._state["messages"]
             ],
         }
+
+
+def _callbacks(settings: Settings) -> dict[str, Any]:
+    """Конфигурация вызова графа: трейсер Opik, если трассировка включена."""
+
+    tracer = _tracer(settings)
+    return {"callbacks": [tracer]} if tracer is not None else {}
 
 
 def _is_tool_call(chunk: Any) -> bool:

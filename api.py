@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from agent import Agent
+from agent import Agent, flush_tracing
 from config import get_api_settings
 from models import AgentResponse
 from nlu.index import ensure_indexed
@@ -114,6 +114,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     indexing.cancel()
     with suppress(asyncio.CancelledError):
         await indexing
+    # Opik отправляет трейсы батчами: при остановке досылаем оставшиеся.
+    await asyncio.to_thread(flush_tracing)
 
 
 async def _prepare_faq_index() -> None:
